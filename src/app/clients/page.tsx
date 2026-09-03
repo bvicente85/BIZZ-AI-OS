@@ -1,11 +1,14 @@
 ﻿'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { getClients, createClient } from '@/lib/services/api';
 import { Client, ClientStatus } from '@/types/database';
+import { useAuth } from '@/lib/context/AuthContext';
 
 export default function ClientsPage() {
+  const { workspaceId, loading: authLoading } = useAuth();
+
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
@@ -18,29 +21,34 @@ export default function ClientsPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function loadClients() {
+  const loadClients = useCallback(async () => {
+    if (!workspaceId) return;
     try {
-      const data = await getClients();
+      const data = await getClients(workspaceId);
       setClients(data);
     } catch (err) {
       console.error('Error fetching clients:', err);
     } finally {
       setLoading(false);
     }
-  }
+  }, [workspaceId]);
 
   useEffect(() => {
-    loadClients();
-  }, []);
+    if (workspaceId) {
+      loadClients();
+    } else if (!authLoading) {
+      setLoading(false);
+    }
+  }, [workspaceId, authLoading, loadClients]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!name.trim()) return;
+    if (!name.trim() || !workspaceId) return;
 
     setSubmitting(true);
     setError(null);
     try {
-      await createClient({
+      await createClient(workspaceId, {
         name,
         industry: industry.trim() || undefined,
         notes: notes.trim() || undefined,
@@ -156,7 +164,7 @@ export default function ClientsPage() {
               </button>
               <button
                 type="submit"
-                disabled={submitting || !name.trim()}
+                disabled={submitting || !name.trim() || !workspaceId}
                 className="px-4 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-zinc-950 text-xs font-semibold disabled:opacity-50 transition-colors"
               >
                 {submitting ? 'A guardar...' : 'Criar Cliente'}
@@ -172,7 +180,7 @@ export default function ClientsPage() {
           <div className="p-8 text-center text-sm text-zinc-500">A carregar clientes...</div>
         ) : clients.length === 0 ? (
           <div className="p-12 text-center space-y-3">
-            <p className="text-zinc-400 text-sm">Nenhum cliente registado ainda.</p>
+            <p className="text-zinc-400 text-sm">Nenhum cliente registado neste workspace.</p>
             <button
               onClick={() => setIsCreating(true)}
               className="text-xs text-emerald-400 hover:underline font-medium"

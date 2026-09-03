@@ -1,14 +1,16 @@
 ﻿'use client';
 
-import { useEffect, useState, Suspense } from 'react';
+import { useEffect, useState, useCallback, Suspense } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { getCases, getClients, createCase } from '@/lib/services/api';
 import { Case, Client, CaseStatus, CasePriority } from '@/types/database';
+import { useAuth } from '@/lib/context/AuthContext';
 
 function CasesContent() {
   const searchParams = useSearchParams();
   const preselectedClientId = searchParams.get('client_id');
+  const { workspaceId, loading: authLoading } = useAuth();
 
   const [cases, setCases] = useState<Case[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
@@ -25,11 +27,12 @@ function CasesContent() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function loadData() {
+  const loadData = useCallback(async () => {
+    if (!workspaceId) return;
     try {
       const [allCases, allClients] = await Promise.all([
-        getCases(),
-        getClients(),
+        getCases(workspaceId),
+        getClients(workspaceId),
       ]);
       setCases(allCases);
       setClients(allClients);
@@ -38,15 +41,19 @@ function CasesContent() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [workspaceId]);
 
   useEffect(() => {
-    loadData();
-  }, []);
+    if (workspaceId) {
+      loadData();
+    } else if (!authLoading) {
+      setLoading(false);
+    }
+  }, [workspaceId, authLoading, loadData]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!title.trim()) return;
+    if (!title.trim() || !workspaceId) return;
 
     setSubmitting(true);
     setError(null);
@@ -56,7 +63,7 @@ function CasesContent() {
         .map((t) => t.trim())
         .filter(Boolean);
 
-      await createCase({
+      await createCase(workspaceId, {
         title,
         description: description.trim() || undefined,
         client_id: clientId || null,
@@ -217,7 +224,7 @@ function CasesContent() {
               </button>
               <button
                 type="submit"
-                disabled={submitting || !title.trim()}
+                disabled={submitting || !title.trim() || !workspaceId}
                 className="px-4 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-zinc-950 text-xs font-semibold disabled:opacity-50 transition-colors"
               >
                 {submitting ? 'A criar...' : 'Criar Case'}
@@ -233,7 +240,7 @@ function CasesContent() {
           <div className="p-8 text-center text-sm text-zinc-500">A carregar cases...</div>
         ) : cases.length === 0 ? (
           <div className="p-12 text-center space-y-3">
-            <p className="text-zinc-400 text-sm">Nenhum Case criado ainda.</p>
+            <p className="text-zinc-400 text-sm">Nenhum Case criado neste workspace.</p>
             <button
               onClick={() => setIsCreating(true)}
               className="text-xs text-emerald-400 hover:underline font-medium"

@@ -1,11 +1,14 @@
 ﻿'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { getConversations, createConversation } from '@/lib/services/api';
 import { Conversation } from '@/types/database';
+import { useAuth } from '@/lib/context/AuthContext';
 
 export default function ConversationsPage() {
+  const { workspaceId, loading: authLoading } = useAuth();
+
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [loading, setLoading] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
@@ -16,30 +19,35 @@ export default function ConversationsPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function loadData() {
+  const loadData = useCallback(async () => {
+    if (!workspaceId) return;
     try {
-      // Fetch only general conversations (case_id === null)
-      const data = await getConversations(null);
+      // Fetch only general conversations (case_id === null) within the active workspace
+      const data = await getConversations(null, workspaceId);
       setConversations(data);
     } catch (err) {
       console.error('Error fetching general conversations:', err);
     } finally {
       setLoading(false);
     }
-  }
+  }, [workspaceId]);
 
   useEffect(() => {
-    loadData();
-  }, []);
+    if (workspaceId) {
+      loadData();
+    } else if (!authLoading) {
+      setLoading(false);
+    }
+  }, [workspaceId, authLoading, loadData]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!title.trim()) return;
+    if (!title.trim() || !workspaceId) return;
 
     setSubmitting(true);
     setError(null);
     try {
-      await createConversation({
+      await createConversation(workspaceId, {
         title,
         case_id: null,
         summary: summary.trim() || undefined,
@@ -120,7 +128,7 @@ export default function ConversationsPage() {
               </button>
               <button
                 type="submit"
-                disabled={submitting || !title.trim()}
+                disabled={submitting || !title.trim() || !workspaceId}
                 className="px-4 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-zinc-950 text-xs font-semibold disabled:opacity-50 transition-colors"
               >
                 {submitting ? 'A criar...' : 'Iniciar Conversa'}
@@ -136,7 +144,7 @@ export default function ConversationsPage() {
           <div className="p-8 text-center text-sm text-zinc-500">A carregar conversas...</div>
         ) : conversations.length === 0 ? (
           <div className="p-12 text-center space-y-3">
-            <p className="text-zinc-400 text-sm">Nenhuma conversa geral registada ainda.</p>
+            <p className="text-zinc-400 text-sm">Nenhuma conversa geral registada neste workspace.</p>
             <button
               onClick={() => setIsCreating(true)}
               className="text-xs text-emerald-400 hover:underline font-medium"

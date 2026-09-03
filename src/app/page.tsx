@@ -1,35 +1,53 @@
 ﻿'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { getClients, getCases, getConversations } from '@/lib/services/api';
 import { Client, Case, Conversation } from '@/types/database';
+import { useAuth } from '@/lib/context/AuthContext';
 
 export default function Dashboard() {
+  const { user, workspaceId, workspaceName, loading: authLoading } = useAuth();
+
   const [clients, setClients] = useState<Client[]>([]);
   const [cases, setCases] = useState<Case[]>([]);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    async function loadData() {
-      try {
-        const [cls, css, cvs] = await Promise.all([
-          getClients(),
-          getCases(),
-          getConversations(),
-        ]);
-        setClients(cls);
-        setCases(css);
-        setConversations(cvs);
-      } catch (err) {
-        console.error('Error loading dashboard data:', err);
-      } finally {
-        setLoading(false);
-      }
+  const loadData = useCallback(async () => {
+    if (!workspaceId) return;
+    try {
+      const [cls, css, cvs] = await Promise.all([
+        getClients(workspaceId),
+        getCases(workspaceId),
+        getConversations(undefined, workspaceId),
+      ]);
+      setClients(cls);
+      setCases(css);
+      setConversations(cvs);
+    } catch (err) {
+      console.error('Error loading dashboard data:', err);
+    } finally {
+      setLoading(false);
     }
-    loadData();
-  }, []);
+  }, [workspaceId]);
+
+  useEffect(() => {
+    if (workspaceId) {
+      loadData();
+    } else if (!authLoading && !user) {
+      setLoading(false);
+    }
+  }, [workspaceId, authLoading, user, loadData]);
+
+  if (authLoading || (loading && workspaceId)) {
+    return (
+      <div className="min-h-[50vh] flex flex-col items-center justify-center space-y-3">
+        <div className="w-6 h-6 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+        <p className="text-xs text-zinc-500 font-medium">A carregar ambiente de trabalho...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8">
@@ -38,11 +56,11 @@ export default function Dashboard() {
         <div>
           <div className="inline-flex items-center gap-2 px-2.5 py-0.5 rounded-full text-xs font-medium bg-zinc-800 text-zinc-300 border border-zinc-700/50 mb-2">
             <span className="w-2 h-2 rounded-full bg-emerald-400" />
-            Sprint 1A Concluído: Núcleo Relacional Ativo
+            Sessão Ativa: {workspaceName || 'Default Workspace'}
           </div>
           <h1 className="text-3xl font-bold tracking-tight text-white">BIZZ-AI-OS Dashboard</h1>
           <p className="text-zinc-400 text-sm mt-1">
-            Gestão de Workspaces, Clientes, Contactos, Cases, Conversas e Mensagens.
+            Gestão protegida por RLS de Clientes, Contactos, Cases, Conversas e Mensagens.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -118,7 +136,7 @@ export default function Dashboard() {
             <p className="text-xs text-zinc-500">A carregar casos...</p>
           ) : cases.length === 0 ? (
             <div className="text-center py-6 border border-dashed border-zinc-800 rounded-lg">
-              <p className="text-xs text-zinc-500">Ainda não existem Cases criados.</p>
+              <p className="text-xs text-zinc-500">Ainda não existem Cases neste workspace.</p>
               <Link
                 href="/cases"
                 className="mt-2 inline-block text-xs font-medium text-emerald-400 hover:underline"

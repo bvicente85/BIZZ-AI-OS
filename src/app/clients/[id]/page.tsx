@@ -5,10 +5,12 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { getClientById, getContactsByClient, createContact, getCases } from '@/lib/services/api';
 import { Client, Contact, Case } from '@/types/database';
+import { useAuth } from '@/lib/context/AuthContext';
 
 export default function ClientDetailPage() {
   const params = useParams();
   const clientId = params?.id as string;
+  const { workspaceId } = useAuth();
 
   const [client, setClient] = useState<Client | null>(null);
   const [contacts, setContacts] = useState<Contact[]>([]);
@@ -30,7 +32,7 @@ export default function ClientDetailPage() {
       const [c, cts, allCases] = await Promise.all([
         getClientById(clientId),
         getContactsByClient(clientId),
-        getCases(),
+        getCases(workspaceId),
       ]);
       setClient(c);
       setContacts(cts);
@@ -40,7 +42,7 @@ export default function ClientDetailPage() {
     } finally {
       setLoading(false);
     }
-  }, [clientId]);
+  }, [clientId, workspaceId]);
 
   useEffect(() => {
     loadData();
@@ -48,11 +50,11 @@ export default function ClientDetailPage() {
 
   async function handleCreateContact(e: React.FormEvent) {
     e.preventDefault();
-    if (!contactName.trim() || !clientId) return;
+    if (!contactName.trim() || !clientId || !workspaceId) return;
 
     setSubmittingContact(true);
     try {
-      await createContact({
+      await createContact(workspaceId, {
         client_id: clientId,
         name: contactName,
         role_position: rolePosition.trim() || undefined,
@@ -201,7 +203,7 @@ export default function ClientDetailPage() {
                 </button>
                 <button
                   type="submit"
-                  disabled={submittingContact || !contactName.trim()}
+                  disabled={submittingContact || !contactName.trim() || !workspaceId}
                   className="px-3 py-1 rounded bg-emerald-500 hover:bg-emerald-400 text-zinc-950 text-xs font-semibold disabled:opacity-50 transition-colors"
                 >
                   {submittingContact ? 'A guardar...' : 'Guardar Contacto'}

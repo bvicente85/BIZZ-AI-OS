@@ -1,6 +1,8 @@
-﻿import { supabase, isSupabaseConfigured, DEFAULT_WORKSPACE_ID } from '../supabase';
+﻿import { createClient as createSupabaseClient } from '@/lib/supabase/client';
+import { isSupabaseConfigured } from '@/lib/supabase';
 import { Client, Contact, Case, Conversation, Message } from '@/types/database';
 
+// Memory/local storage prefix (used ONLY when Supabase is unconfigured in development)
 const STORAGE_PREFIX = 'bizz_ai_os_';
 
 const getLocal = <T>(key: string, defaultVal: T): T => {
@@ -33,20 +35,25 @@ const generateId = (prefix: string): string => {
 // CLIENTS
 // ==========================================
 
-export async function getClients(): Promise<Client[]> {
-  if (isSupabaseConfigured() && supabase) {
-    const { data, error } = await supabase
-      .from('clients')
-      .select('*')
-      .order('created_at', { ascending: false });
+export async function getClients(workspaceId?: string | null): Promise<Client[]> {
+  if (isSupabaseConfigured()) {
+    const supabase = createSupabaseClient();
+    let query = supabase.from('clients').select('*');
+    if (workspaceId) {
+      query = query.eq('workspace_id', workspaceId);
+    }
+    const { data, error } = await query.order('created_at', { ascending: false });
     if (error) throw error;
     return data || [];
   }
-  return getLocal<Client[]>('clients', []);
+  const all = getLocal<Client[]>('clients', []);
+  if (workspaceId) return all.filter((c) => c.workspace_id === workspaceId);
+  return all;
 }
 
 export async function getClientById(id: string): Promise<Client | null> {
-  if (isSupabaseConfigured() && supabase) {
+  if (isSupabaseConfigured()) {
+    const supabase = createSupabaseClient();
     const { data, error } = await supabase
       .from('clients')
       .select('*')
@@ -59,28 +66,23 @@ export async function getClientById(id: string): Promise<Client | null> {
   return all.find((c) => c.id === id) || null;
 }
 
-export async function createClient(payload: {
-  name: string;
-  industry?: string;
-  notes?: string;
-  status?: Client['status'];
-}): Promise<Client> {
-  const newClient: Client = {
-    id: generateId('c'),
-    workspace_id: DEFAULT_WORKSPACE_ID,
-    name: payload.name.trim(),
-    industry: payload.industry?.trim() || null,
-    notes: payload.notes?.trim() || null,
-    status: payload.status || 'active',
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  };
+export async function createClient(
+  workspaceId: string,
+  payload: {
+    name: string;
+    industry?: string;
+    notes?: string;
+    status?: Client['status'];
+  }
+): Promise<Client> {
+  if (!workspaceId) throw new Error('Workspace ID é obrigatório para criar um cliente');
 
-  if (isSupabaseConfigured() && supabase) {
+  if (isSupabaseConfigured()) {
+    const supabase = createSupabaseClient();
     const { data, error } = await supabase
       .from('clients')
       .insert({
-        workspace_id: DEFAULT_WORKSPACE_ID,
+        workspace_id: workspaceId,
         name: payload.name.trim(),
         industry: payload.industry?.trim() || null,
         notes: payload.notes?.trim() || null,
@@ -91,6 +93,17 @@ export async function createClient(payload: {
     if (error) throw error;
     return data;
   }
+
+  const newClient: Client = {
+    id: generateId('c'),
+    workspace_id: workspaceId,
+    name: payload.name.trim(),
+    industry: payload.industry?.trim() || null,
+    notes: payload.notes?.trim() || null,
+    status: payload.status || 'active',
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
 
   const all = getLocal<Client[]>('clients', []);
   const updated = [newClient, ...all];
@@ -103,7 +116,8 @@ export async function createClient(payload: {
 // ==========================================
 
 export async function getContactsByClient(clientId: string): Promise<Contact[]> {
-  if (isSupabaseConfigured() && supabase) {
+  if (isSupabaseConfigured()) {
+    const supabase = createSupabaseClient();
     const { data, error } = await supabase
       .from('contacts')
       .select('*')
@@ -116,32 +130,25 @@ export async function getContactsByClient(clientId: string): Promise<Contact[]> 
   return all.filter((c) => c.client_id === clientId);
 }
 
-export async function createContact(payload: {
-  client_id: string;
-  name: string;
-  role_position?: string;
-  email?: string;
-  phone?: string;
-  notes?: string;
-}): Promise<Contact> {
-  const newContact: Contact = {
-    id: generateId('ct'),
-    workspace_id: DEFAULT_WORKSPACE_ID,
-    client_id: payload.client_id,
-    name: payload.name.trim(),
-    role_position: payload.role_position?.trim() || null,
-    email: payload.email?.trim() || null,
-    phone: payload.phone?.trim() || null,
-    notes: payload.notes?.trim() || null,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  };
+export async function createContact(
+  workspaceId: string,
+  payload: {
+    client_id: string;
+    name: string;
+    role_position?: string;
+    email?: string;
+    phone?: string;
+    notes?: string;
+  }
+): Promise<Contact> {
+  if (!workspaceId) throw new Error('Workspace ID é obrigatório para criar um contacto');
 
-  if (isSupabaseConfigured() && supabase) {
+  if (isSupabaseConfigured()) {
+    const supabase = createSupabaseClient();
     const { data, error } = await supabase
       .from('contacts')
       .insert({
-        workspace_id: DEFAULT_WORKSPACE_ID,
+        workspace_id: workspaceId,
         client_id: payload.client_id,
         name: payload.name.trim(),
         role_position: payload.role_position?.trim() || null,
@@ -155,6 +162,19 @@ export async function createContact(payload: {
     return data;
   }
 
+  const newContact: Contact = {
+    id: generateId('ct'),
+    workspace_id: workspaceId,
+    client_id: payload.client_id,
+    name: payload.name.trim(),
+    role_position: payload.role_position?.trim() || null,
+    email: payload.email?.trim() || null,
+    phone: payload.phone?.trim() || null,
+    notes: payload.notes?.trim() || null,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
+
   const all = getLocal<Contact[]>('contacts', []);
   const updated = [newContact, ...all];
   setLocal('contacts', updated);
@@ -165,20 +185,25 @@ export async function createContact(payload: {
 // CASES
 // ==========================================
 
-export async function getCases(): Promise<Case[]> {
-  if (isSupabaseConfigured() && supabase) {
-    const { data, error } = await supabase
-      .from('cases')
-      .select('*')
-      .order('created_at', { ascending: false });
+export async function getCases(workspaceId?: string | null): Promise<Case[]> {
+  if (isSupabaseConfigured()) {
+    const supabase = createSupabaseClient();
+    let query = supabase.from('cases').select('*');
+    if (workspaceId) {
+      query = query.eq('workspace_id', workspaceId);
+    }
+    const { data, error } = await query.order('created_at', { ascending: false });
     if (error) throw error;
     return data || [];
   }
-  return getLocal<Case[]>('cases', []);
+  const all = getLocal<Case[]>('cases', []);
+  if (workspaceId) return all.filter((c) => c.workspace_id === workspaceId);
+  return all;
 }
 
 export async function getCaseById(id: string): Promise<Case | null> {
-  if (isSupabaseConfigured() && supabase) {
+  if (isSupabaseConfigured()) {
+    const supabase = createSupabaseClient();
     const { data, error } = await supabase
       .from('cases')
       .select('*')
@@ -191,34 +216,26 @@ export async function getCaseById(id: string): Promise<Case | null> {
   return all.find((c) => c.id === id) || null;
 }
 
-export async function createCase(payload: {
-  title: string;
-  description?: string;
-  client_id?: string | null;
-  contact_id?: string | null;
-  status?: Case['status'];
-  priority?: Case['priority'];
-  tags?: string[];
-}): Promise<Case> {
-  const newCase: Case = {
-    id: generateId('cs'),
-    workspace_id: DEFAULT_WORKSPACE_ID,
-    client_id: payload.client_id || null,
-    contact_id: payload.contact_id || null,
-    title: payload.title.trim(),
-    description: payload.description?.trim() || null,
-    status: payload.status || 'active',
-    priority: payload.priority || 'medium',
-    tags: payload.tags || [],
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  };
+export async function createCase(
+  workspaceId: string,
+  payload: {
+    title: string;
+    description?: string;
+    client_id?: string | null;
+    contact_id?: string | null;
+    status?: Case['status'];
+    priority?: Case['priority'];
+    tags?: string[];
+  }
+): Promise<Case> {
+  if (!workspaceId) throw new Error('Workspace ID é obrigatório para criar um Case');
 
-  if (isSupabaseConfigured() && supabase) {
+  if (isSupabaseConfigured()) {
+    const supabase = createSupabaseClient();
     const { data, error } = await supabase
       .from('cases')
       .insert({
-        workspace_id: DEFAULT_WORKSPACE_ID,
+        workspace_id: workspaceId,
         client_id: payload.client_id || null,
         contact_id: payload.contact_id || null,
         title: payload.title.trim(),
@@ -233,6 +250,20 @@ export async function createCase(payload: {
     return data;
   }
 
+  const newCase: Case = {
+    id: generateId('cs'),
+    workspace_id: workspaceId,
+    client_id: payload.client_id || null,
+    contact_id: payload.contact_id || null,
+    title: payload.title.trim(),
+    description: payload.description?.trim() || null,
+    status: payload.status || 'active',
+    priority: payload.priority || 'medium',
+    tags: payload.tags || [],
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
+
   const all = getLocal<Case[]>('cases', []);
   const updated = [newCase, ...all];
   setLocal('cases', updated);
@@ -243,9 +274,16 @@ export async function createCase(payload: {
 // CONVERSATIONS
 // ==========================================
 
-export async function getConversations(caseId?: string | null): Promise<Conversation[]> {
-  if (isSupabaseConfigured() && supabase) {
+export async function getConversations(
+  caseId?: string | null,
+  workspaceId?: string | null
+): Promise<Conversation[]> {
+  if (isSupabaseConfigured()) {
+    const supabase = createSupabaseClient();
     let query = supabase.from('conversations').select('*');
+    if (workspaceId) {
+      query = query.eq('workspace_id', workspaceId);
+    }
     if (caseId !== undefined) {
       if (caseId === null) {
         query = query.is('case_id', null);
@@ -259,13 +297,16 @@ export async function getConversations(caseId?: string | null): Promise<Conversa
   }
 
   const all = getLocal<Conversation[]>('conversations', []);
-  if (caseId === undefined) return all;
-  if (caseId === null) return all.filter((c) => !c.case_id);
-  return all.filter((c) => c.case_id === caseId);
+  let filtered = all;
+  if (workspaceId) filtered = filtered.filter((c) => c.workspace_id === workspaceId);
+  if (caseId === undefined) return filtered;
+  if (caseId === null) return filtered.filter((c) => !c.case_id);
+  return filtered.filter((c) => c.case_id === caseId);
 }
 
 export async function getConversationById(id: string): Promise<Conversation | null> {
-  if (isSupabaseConfigured() && supabase) {
+  if (isSupabaseConfigured()) {
+    const supabase = createSupabaseClient();
     const { data, error } = await supabase
       .from('conversations')
       .select('*')
@@ -278,27 +319,22 @@ export async function getConversationById(id: string): Promise<Conversation | nu
   return all.find((c) => c.id === id) || null;
 }
 
-export async function createConversation(payload: {
-  title: string;
-  case_id?: string | null;
-  summary?: string;
-}): Promise<Conversation> {
-  const newConv: Conversation = {
-    id: generateId('cv'),
-    workspace_id: DEFAULT_WORKSPACE_ID,
-    case_id: payload.case_id || null,
-    title: payload.title.trim(),
-    summary: payload.summary?.trim() || null,
-    status: 'active',
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  };
+export async function createConversation(
+  workspaceId: string,
+  payload: {
+    title: string;
+    case_id?: string | null;
+    summary?: string;
+  }
+): Promise<Conversation> {
+  if (!workspaceId) throw new Error('Workspace ID é obrigatório para criar uma conversa');
 
-  if (isSupabaseConfigured() && supabase) {
+  if (isSupabaseConfigured()) {
+    const supabase = createSupabaseClient();
     const { data, error } = await supabase
       .from('conversations')
       .insert({
-        workspace_id: DEFAULT_WORKSPACE_ID,
+        workspace_id: workspaceId,
         case_id: payload.case_id || null,
         title: payload.title.trim(),
         summary: payload.summary?.trim() || null,
@@ -309,6 +345,17 @@ export async function createConversation(payload: {
     if (error) throw error;
     return data;
   }
+
+  const newConv: Conversation = {
+    id: generateId('cv'),
+    workspace_id: workspaceId,
+    case_id: payload.case_id || null,
+    title: payload.title.trim(),
+    summary: payload.summary?.trim() || null,
+    status: 'active',
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
 
   const all = getLocal<Conversation[]>('conversations', []);
   const updated = [newConv, ...all];
@@ -321,7 +368,8 @@ export async function createConversation(payload: {
 // ==========================================
 
 export async function getMessages(conversationId: string): Promise<Message[]> {
-  if (isSupabaseConfigured() && supabase) {
+  if (isSupabaseConfigured()) {
+    const supabase = createSupabaseClient();
     const { data, error } = await supabase
       .from('messages')
       .select('*')
@@ -341,17 +389,8 @@ export async function createMessage(payload: {
   agent_identifier?: string | null;
   metadata?: Record<string, unknown>;
 }): Promise<Message> {
-  const newMsg: Message = {
-    id: generateId('m'),
-    conversation_id: payload.conversation_id,
-    role: payload.role,
-    agent_identifier: payload.agent_identifier || null,
-    content: payload.content.trim(),
-    metadata: payload.metadata || {},
-    created_at: new Date().toISOString(),
-  };
-
-  if (isSupabaseConfigured() && supabase) {
+  if (isSupabaseConfigured()) {
+    const supabase = createSupabaseClient();
     const { data, error } = await supabase
       .from('messages')
       .insert({
@@ -366,6 +405,16 @@ export async function createMessage(payload: {
     if (error) throw error;
     return data;
   }
+
+  const newMsg: Message = {
+    id: generateId('m'),
+    conversation_id: payload.conversation_id,
+    role: payload.role,
+    agent_identifier: payload.agent_identifier || null,
+    content: payload.content.trim(),
+    metadata: payload.metadata || {},
+    created_at: new Date().toISOString(),
+  };
 
   const all = getLocal<Message[]>('messages', []);
   const updated = [...all, newMsg];

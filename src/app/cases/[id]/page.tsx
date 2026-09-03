@@ -5,10 +5,12 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { getCaseById, getClientById, getConversations, createConversation } from '@/lib/services/api';
 import { Case, Client, Conversation } from '@/types/database';
+import { useAuth } from '@/lib/context/AuthContext';
 
 export default function CaseDetailPage() {
   const params = useParams();
   const caseId = params?.id as string;
+  const { workspaceId } = useAuth();
 
   const [currentCase, setCurrentCase] = useState<Case | null>(null);
   const [client, setClient] = useState<Client | null>(null);
@@ -30,14 +32,14 @@ export default function CaseDetailPage() {
         const cl = await getClientById(c.client_id);
         setClient(cl);
       }
-      const convs = await getConversations(caseId);
+      const convs = await getConversations(caseId, workspaceId);
       setConversations(convs);
     } catch (err) {
       console.error('Error fetching case details:', err);
     } finally {
       setLoading(false);
     }
-  }, [caseId]);
+  }, [caseId, workspaceId]);
 
   useEffect(() => {
     loadData();
@@ -45,11 +47,11 @@ export default function CaseDetailPage() {
 
   async function handleCreateConversation(e: React.FormEvent) {
     e.preventDefault();
-    if (!convTitle.trim() || !caseId) return;
+    if (!convTitle.trim() || !caseId || !workspaceId) return;
 
     setSubmittingConv(true);
     try {
-      await createConversation({
+      await createConversation(workspaceId, {
         case_id: caseId,
         title: convTitle,
         summary: convSummary.trim() || undefined,
@@ -196,7 +198,7 @@ export default function CaseDetailPage() {
               </button>
               <button
                 type="submit"
-                disabled={submittingConv || !convTitle.trim()}
+                disabled={submittingConv || !convTitle.trim() || !workspaceId}
                 className="px-3 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-zinc-950 text-xs font-semibold disabled:opacity-50 transition-colors"
               >
                 {submittingConv ? 'A criar...' : 'Criar Conversa'}

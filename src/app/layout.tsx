@@ -1,6 +1,8 @@
-import type { Metadata } from "next";
+﻿import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import { AuthProvider } from "@/lib/context/AuthContext";
+import { Navigation } from "@/components/Navigation";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -17,8 +19,6 @@ export const metadata: Metadata = {
   description: "AI Business Operating System",
 };
 
-import { Navigation } from "@/components/Navigation";
-
 export default function RootLayout({
   children,
 }: {
@@ -30,10 +30,12 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col bg-zinc-950 text-zinc-100">
-        <Navigation />
-        <div className="flex-1 max-w-6xl w-full mx-auto p-4 sm:p-6">
-          {children}
-        </div>
+        <AuthProvider>
+          <Navigation />
+          <div className="flex-1 max-w-6xl w-full mx-auto p-4 sm:p-6">
+            {children}
+          </div>
+        </AuthProvider>
       </body>
     </html>
   );
