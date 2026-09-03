@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
@@ -152,7 +152,7 @@ export default function DocumentsPage() {
         if (!res.ok || !data.success) {
           setError(
             data.error ||
-              'Falha ao extrair texto do PDF. O documento pode ser uma imagem/scan sem camada de texto.'
+              'O ficheiro PDF não contém texto extraível. Documentos digitalizados ou baseados em imagem requerem OCR, que ainda não está disponível.'
           );
           setProcessing(false);
           return;

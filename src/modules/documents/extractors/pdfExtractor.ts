@@ -1,4 +1,4 @@
-﻿import { extractText } from 'unpdf';
+import { extractText } from 'unpdf';
 import { ExtractionResult } from '../types';
 
 export async function extractPdfText(
@@ -36,7 +36,7 @@ export async function extractPdfText(
           extractedAt: new Date().toISOString(),
         },
         error:
-          'O ficheiro não contém texto extraível. Este documento parece ser um scan ou uma imagem. OCR ainda não está disponível.',
+          'O ficheiro PDF não contém texto extraível. Documentos digitalizados ou baseados em imagem requerem OCR, que ainda não está disponível.',
       };
     }
 
