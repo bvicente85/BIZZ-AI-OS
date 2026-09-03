@@ -2,8 +2,8 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
-import { getClients, getCases, getConversations } from '@/lib/services/api';
-import { Client, Case, Conversation } from '@/types/database';
+import { getClients, getCases, getConversations, getDocuments } from '@/lib/services/api';
+import { Client, Case, Conversation, DocumentRecord } from '@/types/database';
 import { useAuth } from '@/lib/context/AuthContext';
 
 export default function Dashboard() {
@@ -12,19 +12,22 @@ export default function Dashboard() {
   const [clients, setClients] = useState<Client[]>([]);
   const [cases, setCases] = useState<Case[]>([]);
   const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [documents, setDocuments] = useState<DocumentRecord[]>([]);
   const [loading, setLoading] = useState(true);
 
   const loadData = useCallback(async () => {
     if (!workspaceId) return;
     try {
-      const [cls, css, cvs] = await Promise.all([
+      const [cls, css, cvs, docs] = await Promise.all([
         getClients(workspaceId),
         getCases(workspaceId),
         getConversations(undefined, workspaceId),
+        getDocuments(workspaceId),
       ]);
       setClients(cls);
       setCases(css);
       setConversations(cvs);
+      setDocuments(docs);
     } catch (err) {
       console.error('Error loading dashboard data:', err);
     } finally {
@@ -60,10 +63,16 @@ export default function Dashboard() {
           </div>
           <h1 className="text-3xl font-bold tracking-tight text-white">BIZZ-AI-OS Dashboard</h1>
           <p className="text-zinc-400 text-sm mt-1">
-            Gestão protegida por RLS de Clientes, Contactos, Cases, Conversas e Mensagens.
+            Gestão protegida por RLS de Documentos, Clientes, Contactos, Cases e Conversas.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <Link
+            href="/documents"
+            className="px-4 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-zinc-950 text-sm font-semibold transition-colors"
+          >
+            + Intake Documento
+          </Link>
           <Link
             href="/cases"
             className="px-4 py-2 rounded-lg bg-zinc-100 text-zinc-900 hover:bg-white text-sm font-medium transition-colors"
@@ -76,17 +85,22 @@ export default function Dashboard() {
           >
             + Novo Cliente
           </Link>
-          <Link
-            href="/conversations"
-            className="px-4 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-sm font-medium border border-zinc-700 transition-colors"
-          >
-            + Conversa Geral
-          </Link>
         </div>
       </div>
 
       {/* Metrics Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <Link
+          href="/documents"
+          className="p-5 rounded-xl bg-zinc-900/40 border border-zinc-800/80 hover:border-zinc-700 transition-colors block"
+        >
+          <p className="text-xs uppercase font-medium tracking-wider text-zinc-500">Documentos</p>
+          <p className="text-3xl font-bold text-white mt-1">
+            {loading ? '-' : documents.length}
+          </p>
+          <p className="text-xs text-zinc-400 mt-2">Conhecimento extraído</p>
+        </Link>
+
         <Link
           href="/clients"
           className="p-5 rounded-xl bg-zinc-900/40 border border-zinc-800/80 hover:border-zinc-700 transition-colors block"
@@ -95,18 +109,18 @@ export default function Dashboard() {
           <p className="text-3xl font-bold text-white mt-1">
             {loading ? '-' : clients.length}
           </p>
-          <p className="text-xs text-zinc-400 mt-2">Empresas e organizações registadas</p>
+          <p className="text-xs text-zinc-400 mt-2">Empresas registadas</p>
         </Link>
 
         <Link
           href="/cases"
           className="p-5 rounded-xl bg-zinc-900/40 border border-zinc-800/80 hover:border-zinc-700 transition-colors block"
         >
-          <p className="text-xs uppercase font-medium tracking-wider text-zinc-500">Cases Ativos</p>
+          <p className="text-xs uppercase font-medium tracking-wider text-zinc-500">Cases</p>
           <p className="text-3xl font-bold text-white mt-1">
             {loading ? '-' : cases.length}
           </p>
-          <p className="text-xs text-zinc-400 mt-2">Processos e oportunidades de trabalho</p>
+          <p className="text-xs text-zinc-400 mt-2">Processos ativos</p>
         </Link>
 
         <Link
@@ -117,13 +131,57 @@ export default function Dashboard() {
           <p className="text-3xl font-bold text-white mt-1">
             {loading ? '-' : conversations.length}
           </p>
-          <p className="text-xs text-zinc-400 mt-2">Sessões em Cases e conversas gerais</p>
+          <p className="text-xs text-zinc-400 mt-2">Sessões de diálogo</p>
         </Link>
       </div>
 
-      {/* Recent Cases and Conversations */}
+      {/* Recent Documents and Cases */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Cases */}
+        {/* Recent Documents */}
+        <div className="p-5 rounded-xl bg-zinc-900/40 border border-zinc-800/80 space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-base font-semibold text-white">Documentos Recentes</h2>
+            <Link href="/documents" className="text-xs text-zinc-400 hover:text-white">
+              Ver todos →
+            </Link>
+          </div>
+
+          {loading ? (
+            <p className="text-xs text-zinc-500">A carregar documentos...</p>
+          ) : documents.length === 0 ? (
+            <div className="text-center py-6 border border-dashed border-zinc-800 rounded-lg">
+              <p className="text-xs text-zinc-500">Nenhum documento introduzido ainda.</p>
+              <Link
+                href="/documents"
+                className="mt-2 inline-block text-xs font-medium text-emerald-400 hover:underline"
+              >
+                Introduzir primeiro documento ou PDF
+              </Link>
+            </div>
+          ) : (
+            <div className="divide-y divide-zinc-800/60">
+              {documents.slice(0, 5).map((doc) => (
+                <Link
+                  key={doc.id}
+                  href={`/documents/${doc.id}`}
+                  className="py-3 flex items-center justify-between hover:bg-zinc-800/30 px-2 rounded-lg transition-colors block"
+                >
+                  <div className="space-y-0.5">
+                    <p className="text-sm font-medium text-zinc-200">{doc.title}</p>
+                    <p className="text-xs text-zinc-500">
+                      {doc.source_type === 'pdf' ? '📄 PDF' : '📝 Texto manual'} • {doc.source_metadata?.charCount || doc.raw_text.length} chars
+                    </p>
+                  </div>
+                  <span className="text-xs px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-400 border border-zinc-700/50">
+                    {doc.processing_status}
+                  </span>
+                </Link>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Recent Cases */}
         <div className="p-5 rounded-xl bg-zinc-900/40 border border-zinc-800/80 space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-base font-semibold text-white">Casos Recentes</h2>
@@ -160,50 +218,6 @@ export default function Dashboard() {
                   </div>
                   <span className="text-xs px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-400 border border-zinc-700/50">
                     {c.status}
-                  </span>
-                </Link>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Conversations */}
-        <div className="p-5 rounded-xl bg-zinc-900/40 border border-zinc-800/80 space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-base font-semibold text-white">Conversas Recentes</h2>
-            <Link href="/conversations" className="text-xs text-zinc-400 hover:text-white">
-              Ver todas →
-            </Link>
-          </div>
-
-          {loading ? (
-            <p className="text-xs text-zinc-500">A carregar conversas...</p>
-          ) : conversations.length === 0 ? (
-            <div className="text-center py-6 border border-dashed border-zinc-800 rounded-lg">
-              <p className="text-xs text-zinc-500">Ainda não existem Conversas criadas.</p>
-              <Link
-                href="/conversations"
-                className="mt-2 inline-block text-xs font-medium text-emerald-400 hover:underline"
-              >
-                Criar conversa geral com Chief of Staff
-              </Link>
-            </div>
-          ) : (
-            <div className="divide-y divide-zinc-800/60">
-              {conversations.slice(0, 5).map((cv) => (
-                <Link
-                  key={cv.id}
-                  href={`/conversations/${cv.id}`}
-                  className="py-3 flex items-center justify-between hover:bg-zinc-800/30 px-2 rounded-lg transition-colors block"
-                >
-                  <div>
-                    <p className="text-sm font-medium text-zinc-200">{cv.title}</p>
-                    <p className="text-xs text-zinc-500">
-                      {cv.case_id ? 'Vinculada a Case' : 'Conversa Geral'}
-                    </p>
-                  </div>
-                  <span className="text-xs px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-400 border border-zinc-700/50">
-                    {cv.status}
                   </span>
                 </Link>
               ))}

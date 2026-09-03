@@ -1,6 +1,6 @@
-﻿import { createClient as createSupabaseClient } from '@/lib/supabase/client';
+import { createClient as createSupabaseClient } from '@/lib/supabase/client';
 import { isSupabaseConfigured } from '@/lib/supabase';
-import { Client, Contact, Case, Conversation, Message } from '@/types/database';
+import { Client, Contact, Case, Conversation, Message, DocumentRecord } from '@/types/database';
 
 // Memory/local storage prefix (used ONLY when Supabase is unconfigured in development)
 const STORAGE_PREFIX = 'bizz_ai_os_';
@@ -420,4 +420,135 @@ export async function createMessage(payload: {
   const updated = [...all, newMsg];
   setLocal('messages', updated);
   return newMsg;
+}
+
+// ==========================================
+// DOCUMENTS (Sprint 1C-A)
+// ==========================================
+
+export async function getDocuments(
+  workspaceId?: string | null,
+  filters?: {
+    client_id?: string | null;
+    case_id?: string | null;
+    source_type?: string;
+  }
+): Promise<DocumentRecord[]> {
+  if (isSupabaseConfigured()) {
+    const supabase = createSupabaseClient();
+    let query = supabase.from('documents').select('*');
+
+    if (workspaceId) {
+      query = query.eq('workspace_id', workspaceId);
+    }
+    if (filters?.client_id) {
+      query = query.eq('client_id', filters.client_id);
+    }
+    if (filters?.case_id) {
+      query = query.eq('case_id', filters.case_id);
+    }
+    if (filters?.source_type) {
+      query = query.eq('source_type', filters.source_type);
+    }
+
+    const { data, error } = await query.order('created_at', { ascending: false });
+    if (error) throw error;
+    return data || [];
+  }
+
+  const all = getLocal<DocumentRecord[]>('documents', []);
+  let filtered = all;
+  if (workspaceId) filtered = filtered.filter((d) => d.workspace_id === workspaceId);
+  if (filters?.client_id) filtered = filtered.filter((d) => d.client_id === filters.client_id);
+  if (filters?.case_id) filtered = filtered.filter((d) => d.case_id === filters.case_id);
+  if (filters?.source_type) filtered = filtered.filter((d) => d.source_type === filters.source_type);
+  return filtered;
+}
+
+export async function getDocumentById(id: string): Promise<DocumentRecord | null> {
+  if (isSupabaseConfigured()) {
+    const supabase = createSupabaseClient();
+    const { data, error } = await supabase
+      .from('documents')
+      .select('*')
+      .eq('id', id)
+      .single();
+    if (error) return null;
+    return data;
+  }
+  const all = getLocal<DocumentRecord[]>('documents', []);
+  return all.find((d) => d.id === id) || null;
+}
+
+export async function createDocument(
+  workspaceId: string,
+  payload: Omit<DocumentRecord, 'id' | 'created_at' | 'updated_at'>
+): Promise<DocumentRecord> {
+  if (!workspaceId) throw new Error('Workspace ID é obrigatório para registar um documento');
+
+  if (isSupabaseConfigured()) {
+    const supabase = createSupabaseClient();
+    const { data, error } = await supabase
+      .from('documents')
+      .insert({
+        workspace_id: workspaceId,
+        client_id: payload.client_id || null,
+        case_id: payload.case_id || null,
+        title: payload.title.trim(),
+        source_type: payload.source_type,
+        original_filename: payload.original_filename || null,
+        mime_type: payload.mime_type || null,
+        source_metadata: payload.source_metadata || {},
+        content_hash: payload.content_hash || null,
+        raw_text: payload.raw_text,
+        markdown_content: payload.markdown_content,
+        processing_status: payload.processing_status || 'completed',
+        processing_error: payload.processing_error || null,
+      })
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
+  }
+
+  const newDoc: DocumentRecord = {
+    id: generateId('doc'),
+    workspace_id: workspaceId,
+    client_id: payload.client_id || null,
+    case_id: payload.case_id || null,
+    title: payload.title.trim(),
+    source_type: payload.source_type,
+    original_filename: payload.original_filename || null,
+    mime_type: payload.mime_type || null,
+    source_metadata: payload.source_metadata || {},
+    content_hash: payload.content_hash || null,
+    raw_text: payload.raw_text,
+    markdown_content: payload.markdown_content,
+    processing_status: payload.processing_status || 'completed',
+    processing_error: payload.processing_error || null,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
+
+  const all = getLocal<DocumentRecord[]>('documents', []);
+  const updated = [newDoc, ...all];
+  setLocal('documents', updated);
+  return newDoc;
+}
+
+export async function deleteDocument(id: string): Promise<boolean> {
+  if (isSupabaseConfigured()) {
+    const supabase = createSupabaseClient();
+    const { error } = await supabase
+      .from('documents')
+      .delete()
+      .eq('id', id);
+    if (error) throw error;
+    return true;
+  }
+
+  const all = getLocal<DocumentRecord[]>('documents', []);
+  const filtered = all.filter((d) => d.id !== id);
+  setLocal('documents', filtered);
+  return true;
 }

@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -14,6 +14,7 @@ export function Navigation() {
 
   const navItems = [
     { label: 'Dashboard', href: '/' },
+    { label: 'Documentos', href: '/documents' },
     { label: 'Clientes', href: '/clients' },
     { label: 'Cases', href: '/cases' },
     { label: 'Conversas Gerais', href: '/conversations' },
@@ -27,7 +28,7 @@ export function Navigation() {
           <Link href="/" className="flex items-center gap-2">
             <span className="font-bold tracking-wider text-white text-lg">BIZZ-AI-OS</span>
             <span className="text-xs px-2 py-0.5 rounded bg-zinc-800 text-zinc-400 font-mono">
-              Sprint 1B
+              Sprint 1C-A
             </span>
           </Link>
 
