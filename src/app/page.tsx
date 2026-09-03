@@ -17,17 +17,39 @@ export default function Dashboard() {
 
   const loadData = useCallback(async () => {
     if (!workspaceId) return;
+    setLoading(true);
+
     try {
-      const [cls, css, cvs, docs] = await Promise.all([
+      const [clsRes, cssRes, cvsRes, docsRes] = await Promise.allSettled([
         getClients(workspaceId),
         getCases(workspaceId),
         getConversations(undefined, workspaceId),
         getDocuments(workspaceId),
       ]);
-      setClients(cls);
-      setCases(css);
-      setConversations(cvs);
-      setDocuments(docs);
+
+      if (clsRes.status === 'fulfilled') {
+        setClients(clsRes.value);
+      } else {
+        console.error('Error fetching clients for dashboard:', clsRes.reason);
+      }
+
+      if (cssRes.status === 'fulfilled') {
+        setCases(cssRes.value);
+      } else {
+        console.error('Error fetching cases for dashboard:', cssRes.reason);
+      }
+
+      if (cvsRes.status === 'fulfilled') {
+        setConversations(cvsRes.value);
+      } else {
+        console.error('Error fetching conversations for dashboard:', cvsRes.reason);
+      }
+
+      if (docsRes.status === 'fulfilled') {
+        setDocuments(docsRes.value);
+      } else {
+        console.error('Error fetching documents for dashboard:', docsRes.reason);
+      }
     } catch (err) {
       console.error('Error loading dashboard data:', err);
     } finally {
@@ -36,14 +58,16 @@ export default function Dashboard() {
   }, [workspaceId]);
 
   useEffect(() => {
-    if (workspaceId) {
-      loadData();
-    } else if (!authLoading && !user) {
-      setLoading(false);
+    if (!authLoading) {
+      if (workspaceId) {
+        loadData();
+      } else if (!user) {
+        setLoading(false);
+      }
     }
   }, [workspaceId, authLoading, user, loadData]);
 
-  if (authLoading || (loading && workspaceId)) {
+  if (authLoading || (loading && workspaceId && clients.length === 0 && cases.length === 0 && conversations.length === 0)) {
     return (
       <div className="min-h-[50vh] flex flex-col items-center justify-center space-y-3">
         <div className="w-6 h-6 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
@@ -96,7 +120,7 @@ export default function Dashboard() {
         >
           <p className="text-xs uppercase font-medium tracking-wider text-zinc-500">Documentos</p>
           <p className="text-3xl font-bold text-white mt-1">
-            {loading ? '-' : documents.length}
+            {loading && documents.length === 0 ? '-' : documents.length}
           </p>
           <p className="text-xs text-zinc-400 mt-2">Conhecimento extraído</p>
         </Link>
@@ -107,7 +131,7 @@ export default function Dashboard() {
         >
           <p className="text-xs uppercase font-medium tracking-wider text-zinc-500">Clientes</p>
           <p className="text-3xl font-bold text-white mt-1">
-            {loading ? '-' : clients.length}
+            {loading && clients.length === 0 ? '-' : clients.length}
           </p>
           <p className="text-xs text-zinc-400 mt-2">Empresas registadas</p>
         </Link>
@@ -118,7 +142,7 @@ export default function Dashboard() {
         >
           <p className="text-xs uppercase font-medium tracking-wider text-zinc-500">Cases</p>
           <p className="text-3xl font-bold text-white mt-1">
-            {loading ? '-' : cases.length}
+            {loading && cases.length === 0 ? '-' : cases.length}
           </p>
           <p className="text-xs text-zinc-400 mt-2">Processos ativos</p>
         </Link>
@@ -129,7 +153,7 @@ export default function Dashboard() {
         >
           <p className="text-xs uppercase font-medium tracking-wider text-zinc-500">Conversas</p>
           <p className="text-3xl font-bold text-white mt-1">
-            {loading ? '-' : conversations.length}
+            {loading && conversations.length === 0 ? '-' : conversations.length}
           </p>
           <p className="text-xs text-zinc-400 mt-2">Sessões de diálogo</p>
         </Link>
@@ -146,7 +170,7 @@ export default function Dashboard() {
             </Link>
           </div>
 
-          {loading ? (
+          {loading && documents.length === 0 ? (
             <p className="text-xs text-zinc-500">A carregar documentos...</p>
           ) : documents.length === 0 ? (
             <div className="text-center py-6 border border-dashed border-zinc-800 rounded-lg">
@@ -190,7 +214,7 @@ export default function Dashboard() {
             </Link>
           </div>
 
-          {loading ? (
+          {loading && cases.length === 0 ? (
             <p className="text-xs text-zinc-500">A carregar casos...</p>
           ) : cases.length === 0 ? (
             <div className="text-center py-6 border border-dashed border-zinc-800 rounded-lg">

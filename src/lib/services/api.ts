@@ -452,7 +452,13 @@ export async function getDocuments(
     }
 
     const { data, error } = await query.order('created_at', { ascending: false });
-    if (error) throw error;
+    if (error) {
+      if (error.code === 'PGRST205' || error.message?.includes('schema cache')) {
+        console.warn("Tabela 'documents' ainda não existe na base de dados (aguarda Migration 3).");
+        return [];
+      }
+      throw error;
+    }
     return data || [];
   }
 
